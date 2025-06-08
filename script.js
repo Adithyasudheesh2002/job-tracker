@@ -10,6 +10,7 @@ const searchInput = document.getElementById('searchInput');
 const sortSelect = document.getElementById('sortSelect');
 
 let jobs = [];
+let editIndex = null; // NEW: track index for editing
 
 // Show/hide custom job title input
 jobTitleSelect.addEventListener('change', () => {
@@ -44,15 +45,15 @@ function renderJobs() {
   const search = searchInput.value.trim().toLowerCase();
   const sortBy = sortSelect.value;
 
-  // Filter jobs by status
-  let filteredJobs = jobs.filter(job => {
-    const statusMatch = filter === 'all' || job.status.toLowerCase() === filter;
-    const searchMatch =
-      job.title.toLowerCase().includes(search) || job.company.toLowerCase().includes(search);
-    return statusMatch && searchMatch;
-  });
+  let filteredJobs = jobs
+    .map((job, originalIndex) => ({ ...job, originalIndex })) // include original index
+    .filter(job => {
+      const statusMatch = filter === 'all' || job.status.toLowerCase() === filter;
+      const searchMatch =
+        job.title.toLowerCase().includes(search) || job.company.toLowerCase().includes(search);
+      return statusMatch && searchMatch;
+    });
 
-  // Sort jobs
   switch (sortBy) {
     case 'titleAsc':
       filteredJobs.sort((a, b) => a.title.localeCompare(b.title));
@@ -65,12 +66,11 @@ function renderJobs() {
       break;
     case 'dateDesc':
     default:
-      // Most recent first (jobs pushed last are newest)
       filteredJobs = filteredJobs.slice().reverse();
       break;
   }
 
-  filteredJobs.forEach((job, index) => {
+  filteredJobs.forEach((job) => {
     const li = document.createElement('li');
     li.className = 'job-item';
 
@@ -81,15 +81,15 @@ function renderJobs() {
         <p class="job-status status-${job.status}">${job.status}</p>
       </div>
       <div class="job-actions">
-        <button onclick="editJob(${index})">Edit</button>
-        <button onclick="deleteJob(${index})">Delete</button>
+        <button onclick="editJob(${job.originalIndex})">Edit</button>
+        <button onclick="deleteJob(${job.originalIndex})">Delete</button>
       </div>
     `;
     jobList.appendChild(li);
   });
 }
 
-// Add job
+// Add or update job
 jobForm.addEventListener('submit', e => {
   e.preventDefault();
 
@@ -106,12 +106,17 @@ jobForm.addEventListener('submit', e => {
   }
 
   const status = statusSelect.value;
+  const newJob = { title, company, status };
 
-  jobs.push({ title, company, status });
+  if (editIndex !== null) {
+    jobs[editIndex] = newJob;
+    editIndex = null;
+  } else {
+    jobs.push(newJob);
+  }
 
   saveJobs();
   renderJobs();
-
   jobForm.reset();
   customJobTitleInput.style.display = 'none';
 });
@@ -128,6 +133,8 @@ function deleteJob(index) {
 // Edit job
 function editJob(index) {
   const job = jobs[index];
+  editIndex = index;
+
   if (['Software Engineer', 'Data Analyst', 'Product Manager'].includes(job.title)) {
     jobTitleSelect.value = job.title;
     customJobTitleInput.style.display = 'none';
@@ -139,15 +146,12 @@ function editJob(index) {
     customJobTitleInput.value = job.title;
     customJobTitleInput.required = true;
   }
+
   companyInput.value = job.company;
   statusSelect.value = job.status;
-
-  jobs.splice(index, 1);
-  saveJobs();
-  renderJobs();
 }
 
-// Event listeners for filters and search
+// Filters and sorting
 filterStatus.addEventListener('change', renderJobs);
 searchInput.addEventListener('input', renderJobs);
 sortSelect.addEventListener('change', renderJobs);
